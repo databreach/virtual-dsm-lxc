@@ -97,71 +97,8 @@ if [[ $choice == "y" || $choice == "Y" ]]; then
         fi
     done
 
-    # Start LXC container if not running
-    container_status=$(pct status $ct_id 2>&1)
-    if [[ "$container_status" != *"running"* ]]; then
-        log "Starting LXC container $ct_id..."
-        pct start $ct_id || display_error_and_exit "Failed to start LXC container $ct_id."
-    fi
+    log "Configuration completed successfully.\n\nStart the docker image (vdsm/virtual-dsm:latest) inside the LXC container using environment variable DEV=\"N\"."
 
-    # Install git and docker, clone virtual-dsm repository, change code, and generate docker image inside the LXC container
-    lxc-attach -n $ct_id -- /bin/bash -s <<'SCRIPT'
-        set -e; # Exit immediately if a command exits with a non-zero status
-
-        log() {
-            echo -e "$1"
-        }
-
-        export DEBIAN_FRONTEND=noninteractive # Set noninteractive mode
-
-        apt-get update > /dev/null 2>&1
-        apt-get install -y git > /dev/null 2>&1
-
-        # Install Docker prerequisites
-        log "Installing Docker prerequisites..."
-        apt-get install -y ca-certificates curl gnupg > /dev/null 2>&1
-        install -m 0755 -d /etc/apt/keyrings > /dev/null 2>&1
-        curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --yes --dearmor -o /etc/apt/keyrings/docker.gpg > /dev/null 2>&1
-        chmod a+r /etc/apt/keyrings/docker.gpg > /dev/null 2>&1
-
-        # Add the Docker repository to Apt sources
-        echo "deb [arch="$(dpkg --print-architecture)" signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian \
-              $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
-              tee /etc/apt/sources.list.d/docker.list > /dev/null
-
-        apt-get update > /dev/null 2>&1
-
-        # Install Docker packages
-        apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin > /dev/null 2>&1
-
-        # Git clone repository and change code to ignore mknod
-        log "Cloning virtual-dsm repository..."
-        rm -rf virtual-dsm > /dev/null 2>&1
-        git clone https://github.com/vdsm/virtual-dsm.git > /dev/null 2>&1 && cd virtual-dsm
-
-        log "Changing source code to bypass mknod errors..."
-
-        # Comment out lines to replace within install.sh
-        sed -i -e '/{ (cd "$TMP" && cpio -idm <"$TMP\/rd" 2>\/dev\/null); rc=$?; } || :/s/^/#/' src/install.sh
-        sed -i -e '/(( rc != 0 )) && error "Failed to cpio $RDC, reason $rc" && exit 92/s/^/#/' src/install.sh
-        sed -i -e '/tar xpfJ "$HDA.txz" --absolute-names -C "$MOUNT\/"$/ s/^/#/' src/install.sh
-
-        # Add new code to bypass mknod errors within install.sh
-        echo -e '\n  if (cd "$TMP" && errors=$(cpio -idm <"$TMP/rd" 2>&1 | grep -E "mknod|block" || true); [ $? -eq 0 ]); then\n    echo "Extraction successful. Continuing with the script."\n  else\n    echo "Error: Unknown error during cpio extraction. Exiting."\n    echo "Details:"\n    echo "$errors"\n    exit 1\n  fi' | sed -i -e '/^#.*(( rc != 0 )) && error "Failed to cpio $RDC, reason $rc" && exit 92/{r /dev/stdin' -e '}' src/install.sh
-        echo -e '\nif (errors=$(tar xpfJ "$HDA.txz" --absolute-names -C "$MOUNT/" 2>&1 | grep -E "mknod|block" || true); [ $? -eq 0 ]); then\n  echo "Extraction successful. Continuing with the script."\nelse\n  echo "Error: Unknown error during tar extraction. Exiting."\n  echo "Details:"\n  echo "$errors"\n  exit 1\nfi' | sed -i -e '/^#tar xpfJ "$HDA.txz" --absolute-names -C "$MOUNT\/"$/ r /dev/stdin' src/install.sh
-
-        # Comment out lines to replace within network.sh
-        sed -i -e '/^  if \[\[ ! -e "${TAP_PATH}" \]\]; then/,/^  fi$/ s/^/#/' src/network.sh
-
-        # Add new code to bypass mknod errors within network.sh
-        echo -e '\n  if [[ ! -e "${TAP_PATH}" ]]; then\n      if { mknod "${TAP_PATH}" c "${MAJOR}" "${MINOR}" ; rc=$?; } 2>&1 | grep -q "Cannot mknod"; then\n          echo "Error: Cannot mknod operation. Continuing with the script."\n      else\n          echo "Error: Unknown error during mknod. Exiting."\n          exit 20\n      fi\n  fi' | sed -i -e '/^#    (( rc != 0 )) && error "Cannot mknod: ${TAP_PATH} (\$rc)" && exit 20$/{:a; n; /#  fi$/!ba; r /dev/stdin' -e '}' src/network.sh
-
-        # Generate docker image
-        log "Building Docker image (this may take a while)..."
-        docker build -t virtual-dsm . > /dev/null 2>&1
-SCRIPT
-
-    log "Configuration completed successfully.\n\nStart the docker image (virtual-dsm) inside the LXC container using docker run or docker compose."
 else
     clear
     log "\nScript aborted. No changes were made."
