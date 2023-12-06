@@ -35,7 +35,7 @@ read -p "Do you want to continue? (y/n): " choice
 if [[ $choice == "y" || $choice == "Y" ]]; then
     read -p "Enter the LXC Container ID (CT ID): " ct_id
 	read -p "Enter the vGPU card ID (e.g. card1 = 1): " gpu_card
-	read -p "Enter the vGPU renderD ID (e.g. renderD129 = 129): gpu_renderd
+	read -p "Enter the vGPU renderD ID (e.g. renderD129 = 129): " gpu_renderd
 
     # Check if ct_id is a non-empty numeric value
     if [[ ! $ct_id =~ ^[0-9]+$ ]]; then
@@ -93,8 +93,8 @@ if [[ $choice == "y" || $choice == "Y" ]]; then
     configure_device "net/tun" "tun" 10 200
     configure_device "kvm" "kvm" 10 232
     configure_device "vhost-net" "vhost-net" 10 238
-	configure_device "dri/card0" "card0" 226 $gpu_card
-	configure_device "dri/renderD128" "renderD128" 226 $gpu_renderd
+    configure_device "dri/card0" "card0" 226 $gpu_card
+    configure_device "dri/renderD128" "renderD128" 226 $gpu_renderd
 
     # Check and add configuration lines to /et/pve/lxc/<CT ID>.conf
     log "Checking and adding configuration to $config_file..."
