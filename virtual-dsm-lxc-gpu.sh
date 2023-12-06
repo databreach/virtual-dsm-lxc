@@ -80,6 +80,7 @@ if [[ $choice == "y" || $choice == "Y" ]]; then
 
         log "Configuring $device..."
         mkdir -p "/dev-$ct_id/net" || display_error_and_exit "Failed to create /dev-$ct_id/net"
+        mkdir -p "/dev-$ct_id/dri" || display_error_and_exit "Failed to create /dev-$ct_id/dri"
         mknod "/dev-$ct_id/$device" c $major $minor || display_error_and_exit "Failed to mknod /dev-$ct_id/$device"
         chown 100000:100000 "/dev-$ct_id/$device" || display_error_and_exit "Failed to chown /dev-$ct_id/$device"
 
