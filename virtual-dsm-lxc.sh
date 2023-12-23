@@ -97,7 +97,7 @@ if [[ $choice == "y" || $choice == "Y" ]]; then
         fi
     done
 
-    log "Configuration completed successfully.\n\nStart the docker image (vdsm/virtual-dsm:latest) inside the LXC container using environment variable DEV=\"N\"."
+    log "Configuration completed successfully.\n\nStart the docker image (vdsm/virtual-dsm:latest) inside the LXC container."
 
 else
     clear
